@@ -1,6 +1,5 @@
 globals
-[
-  total-Hajjis
+[ total-Hajjis
   Hajjis-Ramy-Done
   Hajjis-Gone-Without-Ramy
   Hajjis-In-Jamarat
@@ -11,8 +10,10 @@ globals
   time_of_scenario
   hazard-type
   fear-speed-controller
-
-]
+  Ped_Speed
+  Ped_Sigma
+  patch_to_meter 
+  tick_to_sec]
 
 breed [Hajjis hajji]
 breed [walls wall]
@@ -33,19 +34,28 @@ turtles-own
 ]
 
 to setup
-  clear-all
+ clear-all
   reset-timer
+  reset-ticks
   set total-Hajjis 0
   set Hajjis-Ramy-Done 0
   set Hajjis-Gone-Without-Ramy 0
   set Hajjis-In-Jamarat 0
   set Hajjis-Exited-From-Jamarat 0
+  set Ped_Speed 1.2192               ; the mean of the normal dist. that the walking speed of the agents are drawn from is set to 1.2192 m/s
+  set Ped_Sigma 0.2                  ; the standard deviation of the normal dist. that the walking speed of the agents are drawn from is set to 0.2 m/s
   set-default-shape turtles "person"
+  let world_width 1776 
+  let world_height 300 
+  let netlogo_width (max-pxcor - 1) - ((min-pxcor + 1))                                                   ; netlogo width in patches (minus 1 patch padding from each side)
+  let netlogo_height (max-pycor - 1) - ((min-pycor + 1))                                                  ; netlogo height in patches (minus 1 patch padding from each side)
+  set patch_to_meter max (list (world_width / netlogo_width) (world_height / netlogo_height))             ; patch_to_meter conversion multiplier
+  set tick_to_sec 1.0 
+  
   setup-Jamarat
   setup-walls
-  add-Hajjis1
+  add-Hajjis
 
-  reset-ticks
 end
 
 to setup-Jamarat
@@ -66,18 +76,24 @@ to setup-walls
 end
 
 
-to add-Hajjis1
-  let current-group Rate-of-Incoming-Hajjis ;; Add upto 5 Hajjis to enter in one iteration
-  if current-group + total-Hajjis > Total-Hajjis-To-Create
-  [set current-group Total-Hajjis-To-Create - total-Hajjis]
-  create-Hajji current-group
-  create-nHajji current-group
-end
 to add-Hajjis
-  let current-group Rate-of-Incoming-Hajjis ;; Add upto 5 Hajjis to enter in one iteration
+  
+   let num-nHajjis 0
+   let num-Hajjis 0 
+   let current-group random 20 ;; Add upto 19 Hajjis to enter in one iteration
+   if timer < 1
+  [ set num-nHajjis 0.3 * Total-Hajjis-To-Create
+    set total-Hajjis-To-Create total-Hajjis-To-Create - num-nHajjis
+    set num-Hajjis current-group - num-nHajjis
+    create-nHajji num-nHajjis
+    create-Hajji num-Hajjis] 
+ 
   if current-group + total-Hajjis > Total-Hajjis-To-Create
   [set current-group Total-Hajjis-To-Create - total-Hajjis]
-  create-Hajji current-group
+   set num-Hajjis current-group - num-nHajjis
+  if ticks mod 5 > -1 and ticks mod 5 < 1
+  [create-Hajji num-Hajjis]
+
 end
 
 to create-Hajji [current-group]
@@ -86,10 +102,12 @@ to create-Hajji [current-group]
  [
     set size 3
 
-    set color white
-
+    set color green
     setxy 1 140 - random-float 46
-    set speed  ( 0.3 + random-float 0.2)
+    set speed random-normal Ped_Speed Ped_Sigma                ; walking speed is randomly drawn from a normal distribution
+    set speed speed / (patch_to_meter / tick_to_sec)                            ; turning ft/s to patch/tick
+    if speed < 0.001 [set speed 0.001]                         ; if speed is too low, set it to very small non-zero value
+    
     set heading 90
     set wait-time -1
     set ramy-done false
@@ -98,31 +116,38 @@ to create-Hajji [current-group]
     set in-queue-ticks 0
     set side-walker  false
     set aimed-jamarah random 3
-
- ]
-  ;set Hajji-count Hajji-count + current-group
-  set total-Hajjis total-Hajjis + current-group
-  set Hajjis-In-Jamarat Hajjis-In-Jamarat + current-group
+]
+set total-Hajjis total-Hajjis + current-group
+set Hajjis-In-Jamarat Hajjis-In-Jamarat + current-group
 end
+
 to create-nHajji [current-group]
 
 
   create-Hajjis current-group
  [
     set size 3
-
     set color green
-  ;  ask n-of 50 nHajjis [ set pcolor black ]
-    setxy random-xcor (170 - random-float 109)
-    set speed (0.3 + random-float 0.2)
+    set aimed-jamarah random 3
+
+    ifelse aimed-jamarah < 1 and aimed-jamarah < 2
+      [setxy (358 -(25 - random-float 19)) (120 + (12 - random-float 9))] ; to ditrbute hajjis in specific area of the fisrt Jamarah
+      [ifelse aimed-jamarah > 0 and aimed-jamarah < 2
+      [setxy (604 -(25 - random-float 19)) (123 + (12 - random-float 9)) ] ; to ditrbute hajjis in specific area of the second Jamarah
+      [setxy (981 - (25 - random-float 19)) (172 + (12 - random-float 9))]] ; to ditrbute hajjis in specific area of the third Jamarah
+
+    set speed random-normal Ped_Speed Ped_Sigma                ; walking speed is randomly drawn from a normal distribution
+    set speed speed / (patch_to_meter / tick_to_sec)                            ; turning ft/s to patch/tick
+    if speed < 0.001 [set speed 0.001]                         ; if speed is too low, set it to very small non-zero value
+   
     set heading 90
-    set wait-time -1
+    set wait-time 0.5
     set ramy-done false
     set going-for-ramy false
     set in-queue false
     set in-queue-ticks 0
-    set side-walker  false
- ]
+    set side-walker  false]
+
   ;set Hajji-count Hajji-count + current-group
   set total-Hajjis total-Hajjis + current-group
   set Hajjis-In-Jamarat Hajjis-In-Jamarat + current-group
